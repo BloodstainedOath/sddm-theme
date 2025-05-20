@@ -1,628 +1,292 @@
-import QtQuick 2.12
-import QtQuick.Layouts 1.12
-import QtQuick.Controls 2.12
+import QtQuick 2.15
+import QtQuick.Layouts 1.15
+import QtQuick.Controls 2.15
+import Qt5Compat.GraphicalEffects
 import SddmComponents 2.0 as SDDM
 
-Rectangle {
-    id: root
-    width: config.autoDetectResolution ? Screen.width : 1920
-    height: config.autoDetectResolution ? Screen.height : 1080
-    
-    // Access to SDDM API
-    SDDM.TextConstants { id: textConstants }
-    
-    // Theme properties
-    readonly property bool isLightTheme: config.themeMode === "light" || 
-                                        (config.themeMode === "auto" && 
-                                         Qt.colorEqual(backgroundColor, Qt.lighter(backgroundColor)))
-    
-    readonly property color primaryColor: isLightTheme ? 
-                                        config.lightThemePrimaryColor : 
-                                        config.darkThemePrimaryColor
-                                        
-    readonly property color backgroundColor: isLightTheme ? 
-                                           config.lightThemeBackgroundColor : 
-                                           config.darkThemeBackgroundColor
-    
-    readonly property color textColor: isLightTheme ? Qt.darker(backgroundColor, 4.5) : Qt.lighter(backgroundColor, 4.5)
-    readonly property color accentColor: config.accentColor
-    
-    // Performance properties
-    readonly property bool useBlur: !config.disableBlur && !config.lowPerformanceMode
-    readonly property bool useAnimations: !config.reduceAnimations
-    readonly property real animationDuration: useAnimations ? 300 * config.animationSpeed : 0
-    
-    // Background
+import "components"
+import "components/common"
+
+Pane {
+  id: root
+  SDDM.TextConstants {id: text_const}
+
+  palette {
+    accent: config.accentColour
+    highlight: config.accentColour
+    text: config.primaryColour
+    placeholderText: Qt.lighter(config.primaryColour, 0.6)
+    buttonText: config.popupsForegroundColour
+    button: config.popupsBackgroundColour
+  }
+
+  height: config.height || Screen.height
+  width: config.width || Screen.width
+  padding: 0
+
+  readonly property int verticalThird: height * 0.33
+  readonly property int horizontalThird: width * 0.33
+
+  LayoutMirroring.enabled: config.mirrorLayout == "auto" ? Qt.locale().textDirection == Qt.RightToLeft : config.boolValue("mirrorLayout")
+  LayoutMirroring.childrenInherit: true
+
+  property bool activateVirtualKeyboard: config.boolValue("virtualKeyboardStartActive")
+  property bool animationsEnabled: config.boolValue("enableAnimations")
+
+  font.family: config.fontFamily
+  font.pointSize: config.fontSize || (Math.min(width, height) / 80)
+  property string iconFont: config.iconFont || config.fontFamily
+
+  property string backgroundType: config.type || "color"
+
+  background: Rectangle {
+    height: root.height
+    width: root.width
     color: config.backgroundColour
 
-    // Background Image
     Image {
-        id: backgroundImage
-        anchors.fill: parent
-        source: config.backgroundMode === "image" ? config.wallpaper : ""
-        fillMode: config.fitWallpaper ? Image.PreserveAspectFit : Image.PreserveAspectCrop
-        visible: config.backgroundMode === "image"
-        
-        // Simple blur alternative - we add a semi-transparent overlay instead
+      id: wallpaper
+
+      height: root.height
+      width: root.width
+
+      source: root.backgroundType === "image" ? config.background : config.wallpaper
+      fillMode: config.boolValue("fitWallpaper") ? Image.PreserveAspectFit : Image.PreserveAspectCrop
+
+      asynchronous: true
+      cache: true
+      clip: true
+
+      RecursiveBlur {
+        visible: false
+        id: blur_wallpaper
+        anchors.fill: wallpaper
+        source: wallpaper
+        radius: config.blurRadius
+        loops: config.blurRecursiveLoops
+      }
     }
-    
-    // Darken layer for better readability
+
     Rectangle {
-        id: darkenLayer
-        anchors.fill: parent
-        color: "black"
-        opacity: 0.4
+      id: darken_wallpaper
+      anchors.fill: parent
+      color: "black"
+      opacity: 0
     }
-    
-    // Clock widget
-    Item {
-        id: clockWidget
-        anchors.centerIn: config.clockPosition === "center" ? parent : undefined
-        anchors.right: config.clockPosition === "right" ? parent.right : undefined
-        anchors.left: config.clockPosition === "left" ? parent.left : undefined
-        anchors.top: config.clockPosition.includes("top") ? parent.top : undefined
-        anchors.bottom: config.clockPosition.includes("bottom") ? parent.bottom : undefined
-        anchors.margins: 40
-        
-        width: clockText.width
-        height: clockText.height + (config.showDate ? dateText.height + 10 : 0)
-        
-        Text {
-            id: clockText
-            anchors.horizontalCenter: parent.horizontalCenter
-            
-            color: textColor
-            font.family: config.fontFamily
-            font.pointSize: config.fontSize * 4
-            font.weight: config.fontWeight
-            
-            text: {
-                var date = new Date();
-                var hours = date.getHours();
-                
-                if (!config.use24HourFormat && hours > 12) {
-                    hours -= 12;
-                }
-                
-                var minutes = date.getMinutes();
-                var seconds = date.getSeconds();
-                var timeString = hours.toString().padStart(2, "0") + ":" + 
-                                minutes.toString().padStart(2, "0");
-                
-                if (config.showSeconds) {
-                    timeString += ":" + seconds.toString().padStart(2, "0");
-                }
-                
-                if (!config.use24HourFormat) {
-                    timeString += hours >= 12 ? " PM" : " AM";
-                }
-                
-                return timeString;
-            }
-            
-            Timer {
-                interval: 1000
-                running: true
-                repeat: true
-                onTriggered: parent.text = parent.text
-            }
-        }
-        
-        Text {
-            id: dateText
-            anchors.top: clockText.bottom
-            anchors.topMargin: 10
-            anchors.horizontalCenter: parent.horizontalCenter
-            
-            visible: config.showDate
-            color: textColor
-            font.family: config.fontFamily
-            font.pointSize: config.fontSize * 1.5
-            font.weight: config.fontWeight
-            
-            text: {
-                var date = new Date();
-                return date.toLocaleDateString(Qt.locale(), config.dateFormat);
-            }
-        }
+  }
+
+  Pane {
+    id: greeter
+    visible: true
+    x: 0; y: 0
+    width: root.width
+    height: root.height
+
+    clip: true
+    background: null
+
+    padding: config.dateTimePadding
+
+    Clock {
+      id: datetime
     }
-    
-    // Login form
-    Rectangle {
-        id: loginForm
-        width: 400
-        height: 480
-        radius: config.roundedCorners ? 10 : 0
-        color: backgroundColor
-        opacity: config.formTransparency
-        
-        anchors.centerIn: parent
-        
-        // Shadow effect using nested rectangles instead of DropShadow
-        Rectangle {
-            id: shadowEffect
-            anchors.fill: parent
-            anchors.margins: -8
-            radius: parent.radius + 8
-            color: "black"
-            opacity: 0.3
-            z: -1
-            visible: config.roundedCorners
+
+    Label {
+      anchors {
+        horizontalCenter: parent.horizontalCenter
+
+        verticalCenter: datetime.is_center_center ? undefined : parent.verticalCenter
+        bottom: datetime.is_center_center ? datetime.top : undefined
+      }
+
+      color: root.palette.text
+      font.pointSize: datetime.fontSize
+
+      renderType: Text.QtRendering
+      text: config.greeting
+      textFormat: Text.MarkdownText
+      horizontalAlignment: Text.AlignHCenter
+    }
+
+    TapHandler {
+      id: tap_handler
+      enabled: parent.visible
+      onTapped: gotoLogin()
+    }
+  }
+
+  Pane {
+    id: login_page
+    visible: false
+    background: null
+
+    anchors {
+      top: parent.top
+      left: parent.left
+      right: parent.right
+      bottom: vkbd_container.top
+    }
+
+    padding: root.font.pointSize
+
+    ColumnLayout {
+      anchors.fill: parent
+      spacing: 0
+
+      Item {
+        id: login_container
+        Layout.fillHeight: true
+        Layout.fillWidth: false
+        Layout.preferredWidth: Math.min(login_form.fontSize * 60, login_page.width)
+        Layout.alignment: Qt.AlignHCenter
+
+        LoginForm {
+          id: login_form
+
+          anchors.centerIn: parent
+
+          onLoginRequest: login_form.login(session.currentIndex);
+          KeyNavigation.down: session
+        }
+      }
+
+      RowLayout {
+        id: footer
+
+        Layout.fillHeight: false
+        Layout.preferredHeight: 36
+        Layout.preferredWidth: root.width
+
+        spacing: root.font.pointSize * 0.5
+
+        SessionSelection {
+          id: session
+          Layout.preferredHeight: parent.Layout.preferredHeight
+          Layout.preferredWidth: Layout.preferredHeight
+
+          KeyNavigation.right: layout
+          KeyNavigation.tab: KeyNavigation.right
         }
 
-        ColumnLayout {
-            anchors.fill: parent
-            anchors.margins: 20
-            spacing: 15
+        Rectangle { // spacer
+          Layout.fillWidth: true
+        }
 
-            // Logo/welcome area
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 120
-                
-                Image {
-                    id: logo
-                    anchors.centerIn: parent
-                    width: 100
-                    height: 100
-                    source: "components/icons/logo.png"
-                    fillMode: Image.PreserveAspectFit
-                    visible: false
-                }
-                
-                Rectangle {
-                    id: avatarBackground
-                    anchors.centerIn: parent
-                    width: 100
-                    height: 100
-                    radius: config.avatarShape === "circle" ? width / 2 : (config.roundedCorners ? 10 : 0)
-                    color: accentColor
-                    visible: !logo.visible
-                    
-                    Text {
-                        anchors.centerIn: parent
-                        text: "👤"
-                        font.pointSize: 40
-                        color: "white"
-                    }
-                }
-            }
-            
-            // User selection combo box
-            ComboBox {
-                id: userBox
-                visible: config.showUserList && !config.disableUserList
-                Layout.fillWidth: true
-                model: userModel
-                currentIndex: userModel.lastIndex
-                textRole: "name"
-                
-                delegate: ItemDelegate {
-                    width: userBox.width
-                    text: config.hideUserNames ? "User " + (index + 1) : name
-                    highlighted: userBox.highlightedIndex === index
-                }
-                
-                onCurrentIndexChanged: {
-                    if (currentIndex >= 0) {
-                        userNameInput.text = config.hideUserNames ? "" : userModel.data(userModel.index(currentIndex, 0), Qt.UserRole + 1)
-                    }
-                }
-            }
-            
-            // Username field
-            TextField {
-                id: userNameInput
-                Layout.fillWidth: true
-                text: config.showLastUser && userModel.lastUser ? userModel.lastUser : ""
-                placeholderText: config.usernamePlaceholder || textConstants.userName
-                visible: !config.showUserList || config.disableUserList
-                
-                onAccepted: {
-                    passwordInput.forceActiveFocus()
-                }
-            }
-            
-            // Password field
-            TextField {
-                id: passwordInput
-                Layout.fillWidth: true
-                placeholderText: config.passwordPlaceholder || textConstants.password
-                echoMode: config.passwordEchoMode === "masked" ? TextInput.Password : 
-                          (config.hidePasswordLength ? TextInput.NoEcho : TextInput.Password)
-                
-                Keys.onEnterPressed: startLogin()
-                Keys.onReturnPressed: startLogin()
-            }
-            
-            // Warning message
-            Label {
-                id: errorMessage
-                Layout.fillWidth: true
-                color: "red"
-                font.bold: true
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-                visible: false
-            }
-            
-            // Login button
-            Button {
-                id: loginButton
-                Layout.fillWidth: true
-                text: config.loginButtonText || textConstants.login
-                visible: config.showLoginButton
-                
-                background: Rectangle {
-                    radius: config.roundedCorners ? 5 : 0
-                    color: loginButton.down ? Qt.darker(accentColor, 1.3) : 
-                          (loginButton.hovered ? Qt.lighter(accentColor, 1.1) : accentColor)
-                }
-                
-                contentItem: Text {
-                    text: loginButton.text
-                    color: "white"
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                }
-                
-                onClicked: startLogin()
-            }
-            
-            // Session selection
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
-                
-                Label {
-                    text: textConstants.session
-                    color: textColor
-                }
-                
-                ComboBox {
-                    id: sessionBox
-                    Layout.fillWidth: true
-                    model: sessionModel
-                    currentIndex: sessionModel.lastIndex
-                    textRole: "name"
-                }
-            }
-            
-            // Keyboard layout
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 10
-                visible: keyboard.layouts.length > 1
-                
-                Label {
-                    text: textConstants.layout
-                    color: textColor
-                }
-                
-                ComboBox {
-                    id: layoutBox
-                    Layout.fillWidth: true
-                    model: keyboard.layouts
-                    currentIndex: keyboard.currentLayout
-                    
-                    onCurrentIndexChanged: {
-                        keyboard.currentLayout = currentIndex
-                    }
-                }
-            }
-            
-            Item {
-                Layout.fillHeight: true
-            }
+        LayoutSelection {
+          id: layout
+          Layout.preferredHeight: parent.Layout.preferredHeight
+          Layout.preferredWidth: Layout.preferredHeight
+
+          KeyNavigation.left: session
+          KeyNavigation.right: accessibility
+          KeyNavigation.tab: KeyNavigation.right
         }
+
+        AccessibilityMenu {
+          id: accessibility
+          Layout.preferredHeight: parent.Layout.preferredHeight
+          Layout.preferredWidth: Layout.preferredHeight
+
+          KeyNavigation.left: layout
+          KeyNavigation.right: power
+          KeyNavigation.tab: KeyNavigation.right
+        }
+
+        PowerMenu {
+          id: power
+          Layout.preferredHeight: parent.Layout.preferredHeight
+          Layout.preferredWidth: Layout.preferredHeight
+
+          KeyNavigation.left: accessibility
+        }
+      }
+
     }
-    
-    // Power menu
-    Row {
-        id: powerControls
-        anchors.bottom: parent.bottom
-        anchors.right: config.powerButtonsPosition.includes("right") ? parent.right : undefined
-        anchors.left: config.powerButtonsPosition.includes("left") ? parent.left : undefined
-        anchors.horizontalCenter: config.powerButtonsPosition.includes("center") ? parent.horizontalCenter : undefined
-        anchors.margins: 20
-        spacing: 10
-        visible: config.showPowerButtons
-        
-        function createPowerButton(iconText, actionText, visible, action) {
-            if (!visible) return null;
-            
-            var button = powerButtonComponent.createObject(powerControls, {
-                "iconText": iconText,
-                "actionText": actionText,
-                "action": action
-            });
-            
-            return button;
-        }
-        
-        Component {
-            id: powerButtonComponent
-            
-            Rectangle {
-                id: powerButton
-                width: 50
-                height: 50
-                radius: config.roundedCorners ? width / 2 : 0
-                color: mouseArea.containsMouse ? Qt.lighter(backgroundColor, 1.5) : backgroundColor
-                opacity: 0.7
-                
-                property string iconText
-                property string actionText
-                property var action
-                
-                // Add simple shadow using nested rectangle
-                Rectangle {
-                    anchors.fill: parent
-                    anchors.margins: -2
-                    radius: parent.radius + 2
-                    color: "black"
-                    opacity: 0.2
-                    z: -1
-                    visible: config.roundedCorners
-                }
-                
-                Text {
-                    anchors.centerIn: parent
-                    text: parent.iconText
-                    color: textColor
-                    font.pointSize: 16
-                }
-                
-                MouseArea {
-                    id: mouseArea
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    onClicked: parent.action()
-                }
-                
-                // Basic tooltip replacement
-                Rectangle {
-                    id: tooltip
-                    visible: mouseArea.containsMouse
-                    opacity: mouseArea.containsMouse ? 1.0 : 0.0
-                    color: Qt.darker(backgroundColor, 1.2)
-                    radius: 3
-                    height: tooltipText.contentHeight + 10
-                    width: tooltipText.contentWidth + 20
-                    x: parent.width / 2 - width / 2
-                    y: -height - 5
-                    
-                    Behavior on opacity {
-                        NumberAnimation { duration: 200 }
-                    }
-                    
-                    Text {
-                        id: tooltipText
-                        anchors.centerIn: parent
-                        text: parent.parent.actionText
-                        color: textColor
-                    }
-                }
-            }
-        }
-        
-        Component.onCompleted: {
-            if (config.shutdownEnabled)
-                createPowerButton("⏻", textConstants.shutdown, true, function() { 
-                    sddm.powerOff(); 
-                });
-                
-            if (config.restartEnabled)
-                createPowerButton("⭮", textConstants.reboot, true, function() { 
-                    sddm.reboot(); 
-                });
-                
-            if (config.suspendEnabled)
-                createPowerButton("⏾", textConstants.suspend, true, function() { 
-                    sddm.suspend(); 
-                });
-                
-            if (config.hibernateEnabled)
-                createPowerButton("⏴", textConstants.hibernate, true, function() { 
-                    sddm.hibernate(); 
-                });
-        }
+  }
+
+  Rectangle {
+    id: vkbd_container
+    visible: false
+
+    width: parent.width
+    implicitHeight: virtual_keyboard.implicitHeight
+    anchors.bottom: parent.bottom
+    color: "transparent"
+
+    Loader {
+      id: virtual_keyboard
+
+      width: parent.width
+      z: 1
+
+      source: "components/VirtualKeyboard.qml"
+      asynchronous: true
+
+      onStatusChanged: {
+        var rect = Qt.inputMethod.keyboardRectangle;
+        if (status == Loader.Ready) accessibility.keyboardStatusChanged(rect.width > 0 || rect.height > 0);
+      }
     }
-    
-    // Accessibility button
-    Rectangle {
-        id: accessibilityButton
-        width: 50
-        height: 50
-        radius: config.roundedCorners ? width / 2 : 0
-        color: mouseArea.containsMouse ? Qt.lighter(backgroundColor, 1.5) : backgroundColor
-        opacity: 0.7
-        
-        // Simple shadow
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -2
-            radius: parent.radius + 2
-            color: "black"
-            opacity: 0.2
-            z: -1
-            visible: config.roundedCorners
-        }
-        
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        anchors.margins: 20
-        
-        Text {
-            anchors.centerIn: parent
-            text: "♿"
-            color: textColor
-            font.pointSize: 16
-        }
-        
-        MouseArea {
-            id: mouseArea
-            anchors.fill: parent
-            hoverEnabled: true
-            onClicked: accessibilityMenu.visible = !accessibilityMenu.visible
-        }
-        
-        Rectangle {
-            id: accessibilityMenu
-            width: 240
-            height: 200
-            radius: config.roundedCorners ? 10 : 0
-            color: backgroundColor
-            opacity: 0.9
-            visible: false
-            
-            // Simple shadow
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: -3
-                radius: parent.radius + 3
-                color: "black"
-                opacity: 0.3
-                z: -1
-                visible: config.roundedCorners
-            }
-            
-            anchors.bottom: parent.top
-            anchors.bottomMargin: 10
-            
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 15
-                spacing: 10
-                
-                CheckBox {
-                    text: "High Contrast"
-                    checked: config.highContrastMode
-                    onCheckedChanged: {
-                        // Would be implemented to adjust contrast
-                    }
-                }
-                
-                CheckBox {
-                    text: "Large Text"
-                    checked: config.largePrintMode
-                    onCheckedChanged: {
-                        // Would be implemented to adjust text size
-                    }
-                }
-                
-                CheckBox {
-                    text: "Virtual Keyboard"
-                    checked: config.virtualKeyboard
-                    onCheckedChanged: {
-                        // Would be implemented to show virtual keyboard
-                    }
-                }
-                
-                CheckBox {
-                    text: "Reduce Animations"
-                    checked: config.reduceAnimations
-                    onCheckedChanged: {
-                        // Would be implemented to reduce animations
-                    }
-                }
-            }
-        }
+  }
+
+  focus: true
+  Keys.onReleased: {
+    if (state == "") gotoLogin()
+  }
+  function gotoLogin() {
+    root.state = "loginForm"
+  }
+
+  states: State {
+    name: "loginForm"
+    when: config.boolValue("skipToLogin")
+    PropertyChanges {
+      target: darken_wallpaper
+      opacity: config.darkenWallpaper
     }
-    
-    // Network status indicator
-    Rectangle {
-        id: networkStatus
-        width: 20
-        height: 20
-        radius: width / 2
-        color: "green" // Would be connected/disconnected status
-        opacity: 0.7
-        
-        // Simple shadow
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -1
-            radius: parent.radius + 1
-            color: "black"
-            opacity: 0.2
-            z: -1
-        }
-        
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.margins: 20
-        visible: config.enableNetworkCheck
-        
-        MouseArea {
-            anchors.fill: parent
-            hoverEnabled: true
-            
-            // Simple tooltip
-            Rectangle {
-                id: networkTooltip
-                visible: parent.containsMouse
-                opacity: parent.containsMouse ? 1.0 : 0.0
-                color: Qt.darker(backgroundColor, 1.2)
-                radius: 3
-                height: networkTooltipText.contentHeight + 10
-                width: networkTooltipText.contentWidth + 20
-                x: -width - 5
-                y: parent.height / 2 - height / 2
-                
-                Behavior on opacity {
-                    NumberAnimation { duration: 200 }
-                }
-                
-                Text {
-                    id: networkTooltipText
-                    anchors.centerIn: parent
-                    text: "Network Connected" // Would be dynamic
-                    color: textColor
-                }
-            }
-        }
+    PropertyChanges {
+      target: blur_wallpaper
+      visible: true
     }
-    
-    // Login function
-    function startLogin() {
-        var username = config.showUserList && !config.disableUserList ? 
-                      userModel.data(userModel.index(userBox.currentIndex, 0), Qt.UserRole + 1) : 
-                      userNameInput.text;
-                      
-        if (username === "") {
-            errorMessage.text = textConstants.prompt.split("%1").join("")
-            errorMessage.visible = true
-            return
+  }
+
+  transitions: Transition {
+    to: "loginForm"
+    SequentialAnimation {
+      ParallelAnimation {
+        NumberAnimation {
+          target: greeter
+          property: "opacity"
+          from: 1; to: 0
+          duration: 150 * root.animationsEnabled
         }
-        
-        if (passwordInput.text === "" && !config.allowEmptyPassword) {
-            errorMessage.text = textConstants.promptPassword
-            errorMessage.visible = true
-            return
+        NumberAnimation {
+          target: greeter
+          property: config.transitionDirection[config.transitionDirection.length-1] == "y" ? "y" : "x"
+          from: 0; to: (property == "y" ? root.verticalThird : root.horizontalThird) * (2 * (config.transitionDirection[0] != "-") - 1)
+          duration: 150 * root.animationsEnabled
         }
-        
-        errorMessage.visible = false
-        sddm.login(username, passwordInput.text, sessionBox.currentIndex)
+      }
+
+      ScriptAction {
+        script: {
+          greeter.visible = false;
+          login_page.visible = true;
+          vkbd_container.visible = true;
+        }
+      }
+      NumberAnimation {
+        target: login_page
+        property: "opacity"
+        from: 0; to: 1
+        duration: 50 * root.animationsEnabled
+      }
     }
-    
-    // Login failed hook
-    Connections {
-        target: sddm
-        
-        function onLoginFailed() {
-            passwordInput.text = ""
-            passwordInput.focus = true
-            errorMessage.text = textConstants.loginFailed
-            errorMessage.visible = true
-            
-            // Implement login attempt tracking here
-        }
-    }
-    
-    Component.onCompleted: {
-        if (config.autoFocusPassword && !config.showUserList) {
-            passwordInput.forceActiveFocus()
-        }
-    }
+  }
+
+  Connections {
+    target: sddm
+    function onLoginSucceeded() {}
+    function onLoginFailed() { login_form.loginFailed(); }
+  }
 }
