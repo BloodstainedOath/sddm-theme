@@ -55,15 +55,6 @@ Pane {
       asynchronous: true
       cache: true
       clip: true
-
-      RecursiveBlur {
-        visible: false
-        id: blur_wallpaper
-        anchors.fill: wallpaper
-        source: wallpaper
-        radius: config.blurRadius
-        loops: config.blurRecursiveLoops
-      }
     }
 
     Rectangle {
