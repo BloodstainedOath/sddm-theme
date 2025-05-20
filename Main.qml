@@ -1,7 +1,6 @@
 import QtQuick 2.12
 import QtQuick.Layouts 1.12
 import QtQuick.Controls 2.12
-import QtGraphicalEffects 1.12
 import SddmComponents 2.0 as SDDM
 
 Rectangle {
@@ -35,7 +34,8 @@ Rectangle {
     
     // Background
     color: config.backgroundColour
-    
+
+    // Background Image
     Image {
         id: backgroundImage
         anchors.fill: parent
@@ -43,12 +43,7 @@ Rectangle {
         fillMode: config.fitWallpaper ? Image.PreserveAspectFit : Image.PreserveAspectCrop
         visible: config.backgroundMode === "image"
         
-        // Background blur effect (optional)
-        layer.enabled: useBlur
-        layer.effect: FastBlur {
-            radius: 64
-            visible: useBlur
-        }
+        // Simple blur alternative - we add a semi-transparent overlay instead
     }
     
     // Darken layer for better readability
@@ -143,19 +138,23 @@ Rectangle {
         
         anchors.centerIn: parent
         
-        layer.enabled: config.roundedCorners
-        layer.effect: DropShadow {
-            radius: 8
-            samples: 17
+        // Shadow effect using nested rectangles instead of DropShadow
+        Rectangle {
+            id: shadowEffect
+            anchors.fill: parent
+            anchors.margins: -8
+            radius: parent.radius + 8
             color: "black"
-            opacity: 0.5
+            opacity: 0.3
+            z: -1
+            visible: config.roundedCorners
         }
-        
+
         ColumnLayout {
             anchors.fill: parent
             anchors.margins: 20
             spacing: 15
-            
+
             // Logo/welcome area
             Item {
                 Layout.fillWidth: true
@@ -356,6 +355,17 @@ Rectangle {
                 property string actionText
                 property var action
                 
+                // Add simple shadow using nested rectangle
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.margins: -2
+                    radius: parent.radius + 2
+                    color: "black"
+                    opacity: 0.2
+                    z: -1
+                    visible: config.roundedCorners
+                }
+                
                 Text {
                     anchors.centerIn: parent
                     text: parent.iconText
@@ -370,10 +380,28 @@ Rectangle {
                     onClicked: parent.action()
                 }
                 
-                ToolTip {
+                // Basic tooltip replacement
+                Rectangle {
+                    id: tooltip
                     visible: mouseArea.containsMouse
-                    text: parent.actionText
-                    delay: 500
+                    opacity: mouseArea.containsMouse ? 1.0 : 0.0
+                    color: Qt.darker(backgroundColor, 1.2)
+                    radius: 3
+                    height: tooltipText.contentHeight + 10
+                    width: tooltipText.contentWidth + 20
+                    x: parent.width / 2 - width / 2
+                    y: -height - 5
+                    
+                    Behavior on opacity {
+                        NumberAnimation { duration: 200 }
+                    }
+                    
+                    Text {
+                        id: tooltipText
+                        anchors.centerIn: parent
+                        text: parent.parent.actionText
+                        color: textColor
+                    }
                 }
             }
         }
@@ -410,6 +438,17 @@ Rectangle {
         color: mouseArea.containsMouse ? Qt.lighter(backgroundColor, 1.5) : backgroundColor
         opacity: 0.7
         
+        // Simple shadow
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -2
+            radius: parent.radius + 2
+            color: "black"
+            opacity: 0.2
+            z: -1
+            visible: config.roundedCorners
+        }
+        
         anchors.left: parent.left
         anchors.bottom: parent.bottom
         anchors.margins: 20
@@ -436,6 +475,17 @@ Rectangle {
             color: backgroundColor
             opacity: 0.9
             visible: false
+            
+            // Simple shadow
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: -3
+                radius: parent.radius + 3
+                color: "black"
+                opacity: 0.3
+                z: -1
+                visible: config.roundedCorners
+            }
             
             anchors.bottom: parent.top
             anchors.bottomMargin: 10
@@ -489,6 +539,16 @@ Rectangle {
         color: "green" // Would be connected/disconnected status
         opacity: 0.7
         
+        // Simple shadow
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: -1
+            radius: parent.radius + 1
+            color: "black"
+            opacity: 0.2
+            z: -1
+        }
+        
         anchors.right: parent.right
         anchors.top: parent.top
         anchors.margins: 20
@@ -498,10 +558,28 @@ Rectangle {
             anchors.fill: parent
             hoverEnabled: true
             
-            ToolTip {
+            // Simple tooltip
+            Rectangle {
+                id: networkTooltip
                 visible: parent.containsMouse
-                text: "Network Connected" // Would be dynamic
-                delay: 500
+                opacity: parent.containsMouse ? 1.0 : 0.0
+                color: Qt.darker(backgroundColor, 1.2)
+                radius: 3
+                height: networkTooltipText.contentHeight + 10
+                width: networkTooltipText.contentWidth + 20
+                x: -width - 5
+                y: parent.height / 2 - height / 2
+                
+                Behavior on opacity {
+                    NumberAnimation { duration: 200 }
+                }
+                
+                Text {
+                    id: networkTooltipText
+                    anchors.centerIn: parent
+                    text: "Network Connected" // Would be dynamic
+                    color: textColor
+                }
             }
         }
     }

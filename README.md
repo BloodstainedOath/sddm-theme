@@ -56,13 +56,14 @@ A modern, lightweight SDDM theme with extensive features and minimal dependencie
 
 ## Requirements
 
-This theme has minimal requirements compared to other themes:
+This theme has extremely minimal requirements compared to other themes:
 
 - SDDM (Simple Desktop Display Manager)
 - Qt 5.12+ (no need for Qt 6)
+- No QtGraphicalEffects dependency
 - Standard system fonts (no special fonts required)
 - Working with standard icon sets
-- No external dependencies
+- No external dependencies or special modules
 
 ## Installation
 
